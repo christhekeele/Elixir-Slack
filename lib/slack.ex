@@ -114,7 +114,7 @@ defmodule Slack do
       end
 
       def websocket_handle({:text, message}, _con, %{slack: slack, state: state}) do
-        message = JSX.decode!(message, [{:labels, :atom}])
+        message = prepare_message message
         if Map.has_key?(message, :type) do
           {:ok, state} = handle_message(message, slack, state)
           {:ok, slack} = handle_slack(message, slack)
@@ -127,6 +127,13 @@ defmodule Slack do
         Enum.reduce(list, %{}, fn (item, map) ->
           Map.put(map, item.id, item)
         end)
+      end
+
+      defp prepare_message(binstring) do
+        binstring
+          |> :binary.split(<<0>>)
+          |> List.first
+          |> JSX.decode!([{:labels, :atom}])
       end
 
       def handle_connect(_slack, state), do: {:ok, state}
