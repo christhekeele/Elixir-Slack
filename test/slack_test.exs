@@ -34,6 +34,16 @@ defmodule SlackTest do
     assert result == {~s/{"channel":"channel","type":"typing"}/, nil}
   end
 
+  test "send_ping sends ping to client" do
+    result = Slack.send_ping(%{socket: nil, client: FakeWebsocketClient})
+    assert result == {~s/{"type":"ping"}/, nil}
+  end
+
+  test "send_ping with data sends ping + data to client" do
+    result = Slack.send_ping([foo: :bar], %{socket: nil, client: FakeWebsocketClient})
+    assert result == {~s/{"foo":"bar","type":"ping"}/, nil}
+  end
+
   test "init formats rtm results properly" do
     rtm = %{
       self: %{name: "fake"},

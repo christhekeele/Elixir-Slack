@@ -163,6 +163,18 @@ defmodule Slack do
   end
 
   @doc """
+  Notifies slack that the current `slack` user is typing in `channel`.
+  """
+  def send_ping(data \\ [], slack) do
+    %{
+      type: "ping"
+    }
+      |> Dict.merge(data)
+      |> JSX.encode!
+      |> send_raw(slack)
+  end
+
+  @doc """
   Sends raw JSON to a given socket.
   """
   def send_raw(json, %{socket: socket, client: client}) do
