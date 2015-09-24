@@ -63,8 +63,9 @@ defmodule Slack do
   * groups - Stored as a map with id's as keys.
   * users - Stored as a map with id's as keys.
   * socket - The connection to Slack.
+  * client - The client that makes calls to Slack.
 
-  For all but `socket`, you can see what types of data to expect each of the
+  For all but `socket` and `client`, you can see what types of data to expect each of the
   types to contain from the [Slack API types] page.
 
   [Slack API types]: https://api.slack.com/types
@@ -75,18 +76,19 @@ defmodule Slack do
       import Slack
       import Slack.Handlers
 
-      def start_link(token, initial_state) do
+      def start_link(token, initial_state, client \\ :websocket_client) do
         {:ok, rtm} = Slack.Rtm.start(token)
 
-        state = %{rtm: rtm, state: initial_state}
+        state = %{rtm: rtm, state: initial_state, client: client}
 
         url = String.to_char_list(rtm.url)
-        :websocket_client.start_link(url, __MODULE__, state)
+        client.start_link(url, __MODULE__, state)
       end
 
-      def init(%{rtm: rtm, state: state}, socket) do
+      def init(%{rtm: rtm, client: client, state: state}, socket) do
         slack = %{
           socket: socket,
+          client: client,
           me: rtm.self,
           team: rtm.team,
           bots: rtm_list_to_map(rtm.bots),
@@ -138,33 +140,32 @@ defmodule Slack do
   @doc """
   Sends `text` to `channel` for the given `slack` connection.
   """
-  def send_message(text, channel, slack, client \\ :websocket_client) do
-    message = JSX.encode!(%{
+  def send_message(text, channel, slack) do
+    %{
       type: "message",
       text: text,
       channel: channel
-    })
-
-    send_raw(message, slack, client)
+    }
+      |> JSX.encode!
+      |> send_raw(slack)
   end
-
 
   @doc """
   Notifies slack that the current `slack` user is typing in `channel`.
   """
-  def indicate_typing(channel, slack, client \\ :websocket_client) do
-    message = JSX.encode!(%{
+  def indicate_typing(channel, slack) do
+    %{
       type: "typing",
       channel: channel
-    })
-
-    send_raw(message, slack, client)
+    }
+      |> JSX.encode!
+      |> send_raw(slack)
   end
 
   @doc """
   Sends raw JSON to a given socket.
   """
-  def send_raw(json, %{socket: socket}, client \\ :websocket_client) do
+  def send_raw(json, %{socket: socket, client: client}) do
     client.send({:text, json}, socket)
   end
 end
