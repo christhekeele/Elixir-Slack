@@ -113,11 +113,11 @@ defmodule Slack do
         {:reply, {:pong, data}, state}
       end
 
-      def websocket_handle({:text, message}, _con, %{slack: slack, state: state}) do
-        message = prepare_message message
-        if Map.has_key?(message, :type) do
-          {:ok, state} = handle_message(message, slack, state)
-          {:ok, slack} = handle_slack(message, slack)
+      def websocket_handle({:text, reply}, _con, %{slack: slack, state: state}) do
+        reply = prepare_reply reply
+        if Map.has_key?(reply, :type) do
+          {:ok, state} = handle_reply(reply, slack, state)
+          {:ok, slack} = handle_slack(reply, slack)
         end
 
         {:ok, %{slack: slack, state: state}}
@@ -129,7 +129,7 @@ defmodule Slack do
         end)
       end
 
-      defp prepare_message(binstring) do
+      defp prepare_reply(binstring) do
         binstring
           |> :binary.split(<<0>>)
           |> List.first
@@ -137,10 +137,16 @@ defmodule Slack do
       end
 
       def handle_connect(_slack, state), do: {:ok, state}
-      def handle_message(_message, _slack, state), do: {:ok, state}
+      def handle_reply(_message, _slack, state), do: {:ok, state}
       def handle_close(_reason, _slack, state), do: {:error, state}
 
-      defoverridable [handle_connect: 2, handle_message: 3, handle_close: 3]
+      # TODO: remove handle_message/3 in favor of handle_reply/3
+      def handle_message(message, slack, state) do
+        IO.puts "warning: handle_message/3 is deprecated, please use handle_reply/3 instead"
+        handle_reply(message, slack, state)
+      end
+
+      defoverridable [handle_connect: 2, handle_reply: 3, handle_message: 3, handle_close: 3]
     end
   end
 

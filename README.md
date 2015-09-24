@@ -39,14 +39,14 @@ defmodule SlackRtm do
     {:ok, initial_state}
   end
 
-  def handle_message(message = %{type: "message"}, slack, state) do
+  def handle_reply(reply = %{type: "message", text: message}, slack, state) do
     message_to_send = "Received #{length(state)} messages so far!"
-    send_message(message_to_send, message.channel, slack)
+    send_message(message_to_send, reply.channel, slack)
 
-    {:ok, state ++ [message.text]}
+    {:ok, state ++ [message]}
   end
 
-  def handle_message(_message, _slack, state) do
+  def handle_reply(_reply, _slack, state) do
     {:ok, state}
   end
 end
@@ -65,9 +65,9 @@ of  `bots`, `channels`, `groups`, and `users`.
 
 [rtm.start]: https://api.slack.com/methods/rtm.start
 
-Slack has *a lot* of message types so it's a good idea to define a callback like
-above where unhandled message types don't crash your application. You can find a
-list of message types and examples on the [RTM API page].
+Slack has *a lot* of reply types so it's a good idea to define a callback like
+above where unhandled reply types don't crash your application. You can find a
+list of reply types and examples on the [RTM API page].
 
 You can find more detailed documentation on the [Slack hexdocs page].
 
