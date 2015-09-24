@@ -15,8 +15,8 @@ defmodule SlackTest do
     assert Bot.handle_connect(nil, 1) == {:ok, 1}
   end
 
-  test "handle_message returns state by default" do
-    assert Bot.handle_message(nil, nil, 1) == {:ok, 1}
+  test "handle_reply returns state by default" do
+    assert Bot.handle_reply(nil, nil, 1) == {:ok, 1}
   end
 
   test "send_raw sends slack formatted to client" do
@@ -42,6 +42,14 @@ defmodule SlackTest do
   test "send_ping with data sends ping + data to client" do
     result = Slack.send_ping([foo: :bar], %{socket: nil, client: FakeWebsocketClient})
     assert result == {~s/{"foo":"bar","type":"ping"}/, nil}
+  end
+
+  test "handle_message issues deprecation warning" do
+    message = "warning: handle_message/3 is deprecated, please use handle_reply/3 instead\n"
+    output = ExUnit.CaptureIO.capture_io(fn ->
+      Bot.handle_message(nil, nil, 1) == {:ok, 1}
+    end )
+    assert output == message
   end
 
   test "init formats rtm results properly" do
