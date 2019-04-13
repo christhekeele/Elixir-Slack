@@ -1,11 +1,15 @@
 defmodule Slack.Lookups do
+  @moduledoc "Utility functions for looking up slack state informatin"
+
   @doc ~S"""
   Turns a string like `"@USER_NAME"` into the ID that Slack understands (`"U…"`).
   """
   def lookup_user_id("@" <> user_name, slack) do
     slack.users
-    |> Map.values
-    |> Enum.find(%{ }, fn user -> user.name == user_name end)
+    |> Map.values()
+    |> Enum.find(%{}, fn user ->
+      user.name == user_name || user.profile.display_name == user_name
+    end)
     |> Map.get(:id)
   end
 
@@ -19,33 +23,41 @@ defmodule Slack.Lookups do
     |> lookup_user_id(slack)
     |> lookup_direct_message_id(slack)
   end
+
   def lookup_direct_message_id(user_id, slack) do
     slack.ims
-    |> Map.values
-    |> Enum.find(%{ }, fn direct_message -> direct_message.user == user_id end)
+    |> Map.values()
+    |> Enum.find(%{}, fn direct_message -> direct_message.user == user_id end)
     |> Map.get(:id)
   end
 
   @doc ~S"""
   Turns a string like `"#CHANNEL_NAME"` into the ID that Slack understands
-  (`"C…"`).
+  (`"C…"`) if a public channel,
+  (`"G…"`) if a group/private channel.
   """
   def lookup_channel_id("#" <> channel_name, slack) do
-    slack.channels
-    |> Map.values
-    |> Enum.find(fn channel -> channel.name == channel_name end)
-    |> Map.get(:id)
+    channel =
+      find_channel_by_name(slack.channels, channel_name) ||
+        find_channel_by_name(slack.groups, channel_name) || %{}
+
+    Map.get(channel, :id)
   end
 
   @doc ~S"""
-  Turns a Slack user ID (`"U…"`) or direct message ID (`"D…"`) into a string in
-  the format "@USER_NAME".
+  Turns a Slack user ID (`"U…"`), direct message ID (`"D…"`), or bot ID (`"B…"`)
+  into a string in the format "@USER_NAME".
   """
   def lookup_user_name(direct_message_id = "D" <> _id, slack) do
     lookup_user_name(slack.ims[direct_message_id].user, slack)
   end
+
   def lookup_user_name(user_id = "U" <> _id, slack) do
     "@" <> slack.users[user_id].name
+  end
+
+  def lookup_user_name(bot_id = "B" <> _id, slack) do
+    "@" <> slack.bots[bot_id].name
   end
 
   @doc ~S"""
@@ -53,5 +65,16 @@ defmodule Slack.Lookups do
   """
   def lookup_channel_name(channel_id = "C" <> _id, slack) do
     "#" <> slack.channels[channel_id].name
+  end
+
+  @doc ~S"""
+  Turns a Slack private channel ID (`"G…"`) into a string in the format "#CHANNEL_NAME".
+  """
+  def lookup_channel_name(channel_id = "G" <> _id, slack) do
+    "#" <> slack.groups[channel_id].name
+  end
+
+  defp find_channel_by_name(nested_map, name) do
+    Enum.find_value(nested_map, fn {_id, map} -> if map.name == name, do: map, else: nil end)
   end
 end

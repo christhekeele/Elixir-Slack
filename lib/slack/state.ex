@@ -1,11 +1,18 @@
 defmodule Slack.State do
+  @moduledoc "Slack state"
   @behaviour Access
 
   def fetch(client, key)
   defdelegate fetch(client, key), to: Map
 
+  def get(client, key, default)
+  defdelegate get(client, key, default), to: Map
+
   def get_and_update(client, key, function)
   defdelegate get_and_update(client, key, function), to: Map
+
+  def pop(client, key)
+  defdelegate pop(client, key), to: Map
 
   defstruct [
     :process,
@@ -43,7 +50,7 @@ defmodule Slack.State do
   end
 
   def update(%{type: "message", subtype: "group_join", channel: channel, user: user}, slack) do
-    update_in(slack, [:groups, channel, :members], &(Enum.uniq([user | &1])))
+    update_in(slack, [:groups, channel, :members], &Enum.uniq([user | &1]))
   end
 
   def update(%{type: "channel_left", channel: channel_id}, slack) do
@@ -51,22 +58,28 @@ defmodule Slack.State do
   end
 
   def update(%{type: "group_left", channel: channel}, slack) do
-    update_in(slack, [:groups], &(Map.delete(&1, channel)))
+    update_in(slack, [:groups], &Map.delete(&1, channel))
   end
 
-  Enum.map(["channel", "group"], fn (type) ->
+  Enum.map(["channel", "group"], fn type ->
     plural_atom = String.to_atom(type <> "s")
 
     def update(%{type: unquote(type <> "_rename"), channel: channel}, slack) do
       put_in(slack, [unquote(plural_atom), channel.id, :name], channel.name)
     end
+
     def update(%{type: unquote(type <> "_archive"), channel: channel}, slack) do
       put_in(slack, [unquote(plural_atom), channel, :is_archived], true)
     end
+
     def update(%{type: unquote(type <> "_unarchive"), channel: channel}, slack) do
       put_in(slack, [unquote(plural_atom), channel, :is_archived], false)
     end
-    def update(%{type: "message", subtype: unquote(type <> "_leave"), channel: channel, user: user}, slack) do
+
+    def update(
+          %{type: "message", subtype: unquote(type <> "_leave"), channel: channel, user: user},
+          slack
+        ) do
       update_in(slack, [unquote(plural_atom), channel, :members], &(&1 -- [user]))
     end
   end)
@@ -79,13 +92,21 @@ defmodule Slack.State do
     put_in(slack, [:users, user, :presence], presence)
   end
 
-  Enum.map(["team_join", "user_change"], fn (type) ->
-    def update(%{type: unquote(type), user: user}, slack) do
-      put_in(slack, [:users, user.id], user)
-    end
-  end)
+  def update(%{type: "presence_change", users: users, presence: presence}, slack) do
+    Enum.reduce(users, slack, fn user, acc ->
+      put_in(acc, [:users, user, :presence], presence)
+    end)
+  end
 
-  Enum.map(["bot_added", "bot_changed"], fn (type) ->
+  def update(%{type: "team_join", user: user}, slack) do
+    put_in(slack, [:users, user.id], user)
+  end
+
+  def update(%{type: "user_change", user: user}, slack) do
+    update_in(slack, [:users, Access.key(user.id, %{})], &Map.merge(&1, user))
+  end
+
+  Enum.map(["bot_added", "bot_changed"], fn type ->
     def update(%{type: unquote(type), bot: bot}, slack) do
       put_in(slack, [:bots, bot.id], bot)
     end
